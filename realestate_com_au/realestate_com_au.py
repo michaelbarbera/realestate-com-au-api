@@ -11,7 +11,7 @@ from fajita import Fajita
 
 import realestate_com_au.settings as settings
 from realestate_com_au.graphql import searchBuy, searchRent, searchSold
-from realestate_com_au.objects.listing import get_listing
+from realestate_com_au.objects.listing import get_listing, parse_marketing_price_text
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,7 @@ class RealestateComAu(Fajita):
         keywords=[],
         exclude_keywords=[],
         sort_type=None,
+        get_market_range=True,
     ):
         def get_query_variables(page=start_page):
             query_variables = {
@@ -185,6 +186,18 @@ class RealestateComAu(Fajita):
 
             return listings
 
+        def parse_market_price(res):
+            data = res.json()
+            results = (
+                json.loads(data.get("data", {}).get(f"{channel}Search", {})\
+                    .get("results", {})\
+                    .get("trackingData", {}))\
+                    .get("first_search_result", {})\
+                    .get("data", {})\
+                    .get("marketing_price_range", {})
+            )
+            return [results]
+
         def get_current_page(**kwargs):
             current_query_variables = json.loads(kwargs["json"]["variables"]["query"])
             return current_query_variables["page"]
@@ -226,6 +239,23 @@ class RealestateComAu(Fajita):
             is_done,
             json=get_payload(get_query_variables(1)),
         )
+
+        if get_market_range:
+            for listing in listings:
+                q_vars = get_query_variables(1)
+                q_vars["localities"] = [{"searchLocation": listing.full_address}]
+
+                market_value = self._scroll(
+                    "",
+                    "POST",
+                    parse_market_price,
+                    next_page,
+                    is_done,
+                    json=get_payload(q_vars),
+                )
+
+                listing.marketing_price_range_text = market_value[0]
+                listing.marketing_price_range = parse_marketing_price_text(market_value[0])
 
         return listings
 

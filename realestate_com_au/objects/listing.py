@@ -16,6 +16,8 @@ class Listing:
     property_type: str
     price: int
     price_text: str                                         #Captures the original text, such as a price range or comment. This is lost when converting to Integer
+    marketing_price_range_text: str
+    marketing_price_range: list
     bedrooms: int
     bathrooms: int
     parking_spaces: int
@@ -76,7 +78,6 @@ def parse_price_text(price_display_text):
     price = None
     if price_text[-1] == "k" or price_text[-1] == "K":
         price = float(price_text[:-1].replace(",", ""))
-
         price *= 1000
     elif price_text[-1] == "m" or price_text[-1] == "M":
         price = float(price_text[:-1].replace(",", ""))
@@ -86,6 +87,26 @@ def parse_price_text(price_display_text):
 
     return int(price)
 
+def parse_market_price_text(price_text):
+    price = None
+    if price_text[-1] == "k" or price_text[-1] == "K":
+        price = float(price_text[:-1].replace(",", ""))
+        price *= 1000
+    elif price_text[-1] == "m" or price_text[-1] == "M":
+        price = float(price_text[:-1].replace(",", ""))
+        price *= 1000000
+    else:
+        price = float(price_text.replace(",", "").split('.')[0])
+
+    return int(price)
+
+def parse_marketing_price_text(marketing_price_text):
+    if not isinstance(marketing_price_text, str):
+        return [-1, -1]
+    bounds = marketing_price_text.split("_")
+    if len(bounds) != 2:
+        return [-1, -1]
+    return [parse_market_price_text(bounds[0]), parse_market_price_text(bounds[1])]
 
 def parse_phone(phone):
     if not phone:
@@ -170,6 +191,8 @@ def get_listing(listing):
     price_text = listing.get("price", {}).get("display", "")
     price = parse_price_text(price_text)
     price_text = listing.get("price", {}).get("display")
+    marketing_price_range_text = ""
+    marketing_price_range = [-1, -1]
     sold_date = listing.get("dateSold", {}).get("display")
     auction = listing.get("auction", {}) or {}
     auction_date = auction.get("dateTime", {}).get("value")
@@ -203,6 +226,8 @@ def get_listing(listing):
         land_size_unit=land_size_unit,
         price=price,
         price_text=price_text,
+        marketing_price_range=marketing_price_range,
+        marketing_price_range_text=marketing_price_range_text,
         auction_date=auction_date,
         available_date=available_date,
         sold_date=sold_date,
